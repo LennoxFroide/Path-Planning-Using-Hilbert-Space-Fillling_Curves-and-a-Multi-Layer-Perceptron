@@ -1,0 +1,2 @@
+# Path-Planning-Using-Hilbert-Space-Fillling_Curves-and-a-Multi-Layer-Perceptron
+ This project used a set of Hilbert Space filling curves to randomly sample points in the configuration space of a mobile robot to create a path from the start configuration to the goal configuration. The exact order of the Hilbert Curve is determined but a Multi-Layer perceptron that was created and trained as part of this project
