@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plot
 import numpy as np
 import generateGraph as getRand
+import generateHilbertGraph as gt
 # Order of the curve
 ORDER = 4
 # Number of quadrants required for this order HC curve
@@ -9,6 +10,9 @@ QUADRANTS = 2 ** ORDER
 TOTAL_VERTICES = QUADRANTS*QUADRANTS
 # PATH
 PATH = [None] * TOTAL_VERTICES
+# Hilbert Graph
+HILBERT_GRAPH = {}
+
 print(len(PATH))
 # RESOLUTION
 RESOLUTION = (100,100)
@@ -107,3 +111,5 @@ nodes = getRand.getRandomPoints(PATH)
 showPath(nodes)
 drawHilbert(RESOLUTION,PATH)
 drawHilbertRand(RESOLUTION,nodes)
+hilbertGraph = gt.generateGraph(nodes,HILBERT_GRAPH)
+print(hilbertGraph)
