@@ -22,7 +22,7 @@ def assesCurveValidity(foundVertices):
         # We have found both vertices within free space (CFREE)
         if firstPairValue and secondPairValue or firstPairValue or secondPairValue:
             # currentlyValid = True
-            threshold = evaluateThreshold(firstPairValue, secondPairValue)
+            threshold = evaluateThreshold(firstPairValue, secondPairValue, threshold)
         firstVertex += 2
     return threshold == 0
 
