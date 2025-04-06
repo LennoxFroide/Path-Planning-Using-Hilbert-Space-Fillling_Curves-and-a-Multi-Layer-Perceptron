@@ -52,5 +52,113 @@ class NeuralNetMLP:
                                 # Result of sigmoid()
         return netInput_hidden,   activation_hidden,    netInput_outputLayer,     activation_output 
     
+    def _computeCost(self,labels_enc, output):
+        """Helper function to compute the cost of training our neural network.
+        It uses L2 regularization."""
+        # The output is an array of predicted labels from the output layer
+        # [n_samples, n_output_units]
+
+        # The cost is computed using L2 regularization-> Log loss 
+        L2_term = (self.l2* (np.sum(self.weights_hidden**2.) + np.sum(self.weights_output**2.)))
+        term1 = -labels_enc * (np.log(output))
+        term2 = (1. - labels_enc) * np.log(1. - output)
+        cost = np.sum(term1 - term2) + L2_term
+        return cost
     
-    pass
+    def predict(self, dataX):
+        """Utility function to predict the label of the points in the dataset."""
+        # Carraying out the feedforward step of the neural network
+        netInput_hidden, activation_hidden, netInput_outputLayer, activation_output = self._forward(dataX)
+        # Picking the index of the max value/ max probability as the predicted class
+        predictedLabel = np.argmax(netInput_outputLayer,axis=1)
+        return predictedLabel
+    
+    def fit(self, trainingSet, trainingSetLabels, validationSet, validationSetLabels):
+        """Utility function to train the neural network and learn the weights."""
+        # Grabbing the nmber of classes
+        numberOfLabels = np.unique(trainingSetLabels).shape[0]
+        # Grabbing the number of features in the dataset
+        numberOfFeatures = trainingSet.shape[1]
+        # Initializing our weights and biases for the hidden layer
+        self.bias_hidden = np.zeros(self.n_hidden)
+        self.weights_hidden = self.random.normal(loc=0.0, scale=0.1,size=(numberOfFeatures, self.n_hidden))
+
+        # Initializing our weights and biases for the output layer
+        self.bias_output = np.zeros(numberOfLabels)
+        self.weights_output = self.random.normal(loc=0.0, scale=0.1, size=(self.n_hidden,numberOfLabels))
+
+        # Converting number of epochs into a string
+        epochStringLength = len(str(self.epochs))
+        # Hashmap to store the stats from the training process
+        """Note the syntax of declaring this variable name. This is how we declare class
+        properties that are initialized by class functions instead of init()"""
+        self.evaluation_ = {'cost':[], 'trainingAccuracy':[], 'validationAccuracy':[]}
+        # Getting the one-hot encoded labels
+        trainingSetLabelOneHot = self._onehot(trainingSetLabels, numberOfLabels)
+
+        # Iterating over each epoch
+        for epoch in range(self.epochs):
+            # Iterating over mini-batches
+            # arange() -> returns evenly spaced values within a gien interval
+            indices = np.arange(trainingSet.shape[0])
+
+            # Shuffling our indices to keep the neural network from memorizing the dataset
+            if self.shuffle:
+                self.random.shuffle(indices)
+
+            for startIndex in range(0, indices.shape[0] - self.minibatch_size + 1,self.minibatch_size):
+                # Getting the current batch index
+                batchIndices = indices[startIndex:startIndex+self.minibatch_size]
+
+                ########################## FORWARD PROPAGATION ####################
+                netInputToHiddenLayer, activationHiddenLayer, netInputToOutputLayer, activationOutputLayer = self._forward(trainingSet[batchIndices])
+                
+
+                ########################### BACKPROPAGATION ########################
+                # Calculating the error in the predicted
+                errorInOutput = activationOutputLayer - trainingSetLabelOneHot[batchIndices]
+                # Getting the derivative of the sigmoid function
+                sigmoidDerivative = activationHiddenLayer * (1. - activationHiddenLayer)
+                # Calculating the error in the hidden layer
+                errorInHiddenLayer = (np.dot(errorInOutput,self.weights_output.T)* sigmoidDerivative)
+                # # Calculating the gradients in the hidden layer
+                gradientsOfHiddenLayerWeights = np.dot(trainingSet[batchIndices].T,errorInHiddenLayer)
+                gradientsOfHiddenLayerBiases = np.sum(errorInHiddenLayer, axis = 0)
+                # Calculating the output layer gradients
+                gradientsOfOutputLayerWeights = np.dot(activationHiddenLayer.T,errorInOutput)
+                gradientsOfOutputLayerBiases = np.sum(errorInOutput,axis = 0)
+
+
+                ################## REGULARIZATION AND UPDATING WEIGHTS ##############
+                deltaOfHiddenLayerWeights = (gradientsOfHiddenLayerWeights + self.l2*self.weights_hidden)
+                deltaOfHiddenLayerBiases = gradientsOfHiddenLayerBiases # Bias is not regularized
+                self.weights_hidden -= self.eta * deltaOfHiddenLayerWeights
+                self.bias_hidden -= self.eta * deltaOfHiddenLayerBiases
+
+                deltaOfOutputLayerWeights = (gradientsOfOutputLayerWeights + self.l2*self.weights_output)
+                deltaOfOutputLayerBiases = gradientsOfOutputLayerBiases # The bias is not regularized
+                self.weights_output -= self.eta * deltaOfOutputLayerWeights
+                self.bias_output -= self.eta * deltaOfOutputLayerBiases
+            
+            ##################################### EVALUATION #################################
+            """Evaluation after each epoch during training is necessary. Notice that instead
+            of using only a mini-batch for this forward propagation, we are using the entire
+            training set. """
+            netInputToHiddenLayer, activationHiddenLayer, netInputToOutputLayer, activationOutputLayer = self._forward(trainingSet)
+            # Computing the cost of training the neural network
+            cost = self._computeCost(labels_enc=trainingSetLabelOneHot,output=activationOutputLayer)
+            # Asking our model to make predictions so that we can evaluate its performance
+            trainingSetPredictedLabels = self.predict(trainingSet)
+            validationSetPredictedLabels = self.predict(validationSet)
+            # Calculating the performance accuracy
+            trainingSetAccuracy = ((np.sum(trainingSetLabels == trainingSetPredictedLabels)).astype(np.float)/ trainingSet.shape[0])
+            validationSetAccuracy = ((np.sum(validationSetLabels == validationSetPredictedLabels)).astype(np.float)/validationSet.shape[0])
+
+            sys.stderr.write('\r%0*d/%d | Cost: %.2f' '| Train/Valid Acc: %.2f%%/%.2f%%' (epochStringLength, epoch + 1, self.epochs, cost,
+                                                                                          trainingSetAccuracy*100, validationSetAccuracy*100))
+            sys.stderr.flush()
+
+            self.evaluation_['cost'].append(cost)
+            self.evaluation_['trainingAccuracy'].append(trainingSetAccuracy)
+            self.evaluation_['validationAccuracy'].append(validationSetAccuracy)
+        return self
