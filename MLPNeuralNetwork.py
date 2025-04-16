@@ -31,7 +31,7 @@ class NeuralNetMLP:
         onehotArray = np.zeros((unique_labels, labels.shape[0]))
         for index, value in enumerate(labels.astype(int)):
             # Adding a one to the specific (row,col) pair to indicate the specific label for a sample
-            onehotArray[value, index] = 1
+            onehotArray[value-4,index]=1
         return onehotArray.T # Returning the transpose to have uniquelabels * size samples
     
     def _sigmoid(self, netInput):
@@ -151,10 +151,10 @@ class NeuralNetMLP:
             trainingSetPredictedLabels = self.predict(trainingSet)
             validationSetPredictedLabels = self.predict(validationSet)
             # Calculating the performance accuracy
-            trainingSetAccuracy = ((np.sum(trainingSetLabels == trainingSetPredictedLabels)).astype(np.float)/ trainingSet.shape[0])
-            validationSetAccuracy = ((np.sum(validationSetLabels == validationSetPredictedLabels)).astype(np.float)/validationSet.shape[0])
+            trainingSetAccuracy = ((np.sum(trainingSetLabels == trainingSetPredictedLabels)).astype(np.float64)/ trainingSet.shape[0])
+            validationSetAccuracy = ((np.sum(validationSetLabels == validationSetPredictedLabels)).astype(np.float64)/validationSet.shape[0])
 
-            sys.stderr.write('\r%0*d/%d | Cost: %.2f' '| Train/Valid Acc: %.2f%%/%.2f%%' (epochStringLength, epoch + 1, self.epochs, cost,
+            sys.stderr.write('\r%0*d/%d | Cost: %.2f' '| Train/Valid Acc: %.2f%%/%.2f%%' % (epochStringLength, epoch + 1, self.epochs, cost,
                                                                                           trainingSetAccuracy*100, validationSetAccuracy*100))
             sys.stderr.flush()
 
