@@ -113,9 +113,57 @@ class Anchor:
         return generatedPath
 
 
-    def localPlanner(self,start,end,isOptimal):
+    def localPlanner(self,currentNode,localStart,target,isOptimal):
+        # TODO: Might need to get rid of all of the lines beofre currentVertex
+        # Calculate the slope
+        slope = None
+        # Generate the straight line approximate solution
+        straightLinePath = None
+        # Calculate the orientation to goal
+        orientationToGoal = self.orientationToGoal(localStart,target)
+        # Obtain the peek directions
+        peekDirection = self.peekDirectionsToTarget(orientationToGoal)
+        # Traverse the straight line 
+        currentVertex = localStart
+        vertex = currentVertex
+        vertexIndex = 0
+        straightPath = straightLinePath.keys()
+        while vertex != target:
+            # TODO: We need some flag that will indicate whether we reinitialize
+            # the vertex index since we're building a new straight line or whether we're traversing the 
+            # current straight line to the target ( No obstacle on path).
+            # Calculate the slope
+            slope = None
+            # Generate the straight line approximate solution
+            straightLinePath = None
+            # Calculate the orientation to goal
+            orientationToGoal = self.orientationToGoal(vertex,target)
+            # Obtain the peek directions
+            peekDirection = self.peekDirectionsToTarget(orientationToGoal)
+            vertex = straightPath[vertexIndex]
+            if straightLinePath[vertex]:
+                if vertex == localStart:
+                    vertexIndex += 1
+                # The vertex in straightLine is in free space
+                nextNode = self.makeLocalConnection(currentNode,vertex)
+                currentVertex = vertex
+                currentNode = nextNode
+                vertexIndex += 1
+            else: # Not in free space
+                for direction in peekDirection:
+                    vertexInteger = self.getInteger(vertex)
+                    xPeek = vertexInteger[0] + direction[0]
+                    yPeek = vertexInteger[1] + direction[1]
 
-        pass
+                    stringXYPeek = self.getStringKeys(xPeek,yPeek)
+                    if stringXYPeek in self.freeSpaceGraph:
+                        nextNode = self.makeLocalConnection(currentNode,stringXYPeek)
+                        currentVertex = stringXYPeek
+                        currentNode = nextNode
+                        continue
+        # This will be the tail node and we can traverse it in the reverse direction
+        return currentNode
+            
 
 
 
@@ -149,7 +197,7 @@ class Anchor:
                             break
         return nearestNeighbours
 
-        pass
+
     def getVerticesFromThreshold(self,thresholdValue,goalOrientation):
         """Append optimal node varinaces first."""
         pass
@@ -164,6 +212,24 @@ class Anchor:
     def notInRange(self,x,y):
         pass
 
+    def peekDirectionsToTarget(self,orientationToGoal):
+        if orientationToGoal == "R_":
+            return [[1,-1],[1,1]]
+        if orientationToGoal == "RU":
+            return [[1,0],[0,-1]]
+        if orientationToGoal == "_U":
+            return [[1,-1],[-1,-1]]
+        if orientationToGoal == "LU":
+            return [[0,-1],[-1,0]]
+        if orientationToGoal == "L_":
+            return [[-1,-1],[-1,1]]
+        if orientationToGoal == "LD":
+            return [[-1,0],[0,1]]
+        if orientationToGoal == "_D":
+            return [[-1,1],[1,1]]
+        if orientationToGoal == "RD":
+            return [[0,1],[1,0]]
+    
     def makeLocalConnection(self,currentNode,nextVertex):
         nextNode = LinkedListNode(nextVertex)
         currentNode.next = nextNode
