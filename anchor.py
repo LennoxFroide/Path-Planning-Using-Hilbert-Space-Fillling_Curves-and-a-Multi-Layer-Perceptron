@@ -32,7 +32,7 @@ class Anchor:
         """Helper function that generates al of the (x,y) pairs that lie on a straight 
         line connecting start coordinate"""
         straightLineCoordinatesMap = dict()
-        for currentX in range(0,dimension + 1):
+        for currentX in range(0,dimension):
             currentY = int(self.equationOfLineOutput(currentX))
             stringCoordinate = self.getStringKeys(currentX,currentY)
             straightLineCoordinatesMap[stringCoordinate] = False
@@ -47,17 +47,17 @@ class Anchor:
         return lineCoordinates
     
     def determineLocalSweep(self,length,orderOfCurve,dimension):
-        length = dimension
+        length, _ = dimension
         numberOfQuadrants = 2**orderOfCurve
         # TODO: Add an int() to assess its impact on the quotieint
         threshold = length / numberOfQuadrants
         return threshold
 
-    def buildHilbertSolution(self,straightLinePath,start,goal,foundVertices,length,orderOfCurve,dimension,current = None):
+    def buildHilbertSolution(self,straightLinePath,start,goal,foundVertices,length,orderOfCurve,variances,dimension,current = None):
         # Getting the threshold for the current Hilbert curve
         threshold = self.determineLocalSweep(length,orderOfCurve,dimension)
         # Getting the orientation to goal's coordinate
-        goalOrientation, variances = self.orientationToGoal(start,goal)
+        goalOrientation = self.orientationToGoal(start,goal)
 
         """Decision making step."""
         # Since a straight line is the closest path between two points ,we will use it
@@ -66,6 +66,7 @@ class Anchor:
         currentVertex = start
         currentNode = LinkedListNode(currentVertex)
         generatedPath = DoublyLinkedList(currentNode)
+        generatedPath.updateLength()
         # currentPointer = currentNode
         # Traversing the straight line path
         straightLineVertices = list(straightLinePath.keys())
@@ -76,12 +77,14 @@ class Anchor:
             if value == True:# Purely straight line points connections
                 nextVertex = vertex
                 nextNode = self.makeLocalConnection(currentNode,nextVertex)
+                generatedPath.updateLength()
                 currentVertex = nextVertex
                 currentNode = nextNode
                 vertexIndex += 1
             # Straight line vertex is not in free space/ freeSpaceGraph
             else:
-                nearestNeighbours = self.getNearestNeighbours(foundVertices,vertex,threshold,variances,goalOrientation,straightLinePath)
+                vertex = self.getInteger(vertex)
+                nearestNeighbours = self.getNearestNeighbours(foundVertices,vertex,threshold,variances,goalOrientation,dimension,straightLinePath)
                 currentVertexInteger = self.getInteger(currentVertex)
                 optimalPoint = [currentVertexInteger[0] + threshold, currentVertexInteger[1] + threshold]
                 optimalPointString = self.getStringKeys(optimalPoint)
@@ -167,50 +170,101 @@ class Anchor:
 
 
 
-    def getNearestNeighbours(self,foundHilberts,currentVertex,threshold,variances,goalOrientation,straightLine=None):
-        possibleHilbertOffsets = self.getVerticesFromThreshold(threshold,goalOrientation)
+    def getNearestNeighbours(self,foundHilberts,currentVertex,threshold,varianceConstant,goalOrientation,dimension,straightLine=None):
+        # TODO: WE NEED TO BIAS THE THRESHOLD AND VARIANCE IN THE DIRECTION OF THE GOAL.
+        possibleHilbertOffsets = self.getVerticesFromThreshold(threshold)
         nearestNeighbours = set()
         for offset in possibleHilbertOffsets:
             #nearestNeighbours = []
             xCandidate = currentVertex[0] + offset[0]
+            xCandidate = self.roundValue(xCandidate)
             yCandidate = currentVertex[1] + offset[1]
-            if self.notInRange(xCandidate,yCandidate):
+            yCandidate = self.roundValue(yCandidate)
+            if self.notInRange(xCandidate,yCandidate,dimension):
                 continue
             hilbertCandidate = self.getStringKeys(xCandidate,yCandidate)
             # The candidate if on a valid hilbert vertex
+            # TODO: This has to be a bit more sophisticated. Maybe look if a hilbert curve is a pixel away from a possible hilbert vertex
             if hilbertCandidate in foundHilberts:
                 if foundHilberts[hilbertCandidate]:
                     # Whenever we find a neighbour we append and move on
                     nearestNeighbours.add([xCandidate,yCandidate])
                     continue
-                else:
-                    # We apply variances to attempt to get a solution
-                    for variance in variances:
-                        XVarCandidate = xCandidate + variance[0]
-                        yVarCandidate = yCandidate + variance[1]
-                        # Check if varinace candidate is valid
-                        varinceCandidateKey = self.getStringKeys(XVarCandidate,yVarCandidate)
-                        # If we find the variance vertex in hilbert space we add it to neighbours
-                        # and we move on.
-                        if varinceCandidateKey in foundHilberts or varinceCandidateKey in self.freeSpaceGraph:
-                            nearestNeighbours.add([XVarCandidate,yVarCandidate])
-                            break
+            else:
+                # We apply variances to attempt to get a solution
+                variances = self.applyVariances(varianceConstant,[xCandidate,yCandidate])
+                for variancePoint in variances:
+                    # TODO: Modified the logic here
+                    # XVarCandidate = xCandidate + variance[0]
+                    # yVarCandidate = yCandidate + variance[1]
+                    # Check if varinace candidate is valid
+                    varinceCandidateKey = self.getStringKeys(variancePoint[0],variancePoint[1])
+                    # If we find the variance vertex in hilbert space we add it to neighbours
+                    # and we move on.
+                    if varinceCandidateKey in foundHilberts:# or varinceCandidateKey in self.freeSpaceGraph:
+                        # nearestNeighbours.add(variancePoint)
+                        nearestNeighbours.add(varinceCandidateKey)
+                        break
         return nearestNeighbours
 
 
-    def getVerticesFromThreshold(self,thresholdValue,goalOrientation):
+    def getVerticesFromThreshold(self,thresholdValue):
         """Append optimal node varinaces first."""
-        pass
+        offests = [[thresholdValue,0],
+                   [thresholdValue,-thresholdValue],
+                   [0,-thresholdValue],
+                   [-thresholdValue,-thresholdValue],
+                   [-thresholdValue,0],
+                   [-thresholdValue,thresholdValue],
+                   [0,thresholdValue],
+                   [thresholdValue,-thresholdValue]]
+        return offests
+    
 
     def getInteger(self,vertex):
         """Return the integer value of the current vertex."""
-        pass
-
+        coordinates = vertex.split(",")
+        coordinates[0] = int(coordinates[0])
+        coordinates[1] = int(coordinates[1])
+        return coordinates
+    
+    def roundValue(self,value):
+        if isinstance(value,int):
+            pass
+        else:
+            stringValue = str(value)
+            partitioned = stringValue.split(".")
+            # print(partitioned[1])
+            intDecimal = int(partitioned[1])
+            if intDecimal >= 50:
+                value = int(partitioned[0]) + 1
+            else:
+                value = int(partitioned[0])
+        return value
+    
     def orientationToGoal(self,start,goal):
-        pass
+        """Helper function to determine the direction in which the goal configuration lies
+        relative to the start configuration."""
+        x1, y1 = start
+        x2, y2 = goal
 
-    def notInRange(self,x,y):
-        pass
+        if x1 > x2:
+            horizontalDirection = 'L'
+        elif x1 < x2:
+            horizontalDirection = 'R'
+        else:
+            horizontalDirection = '_'
+
+        if y1 > y2:
+            verticalDirection = 'U'
+        elif y1 < y2:
+            verticalDirection = 'D'
+        else:
+            verticalDirection = '_'
+        return horizontalDirection + verticalDirection
+
+    def notInRange(self,x,y,dimension):
+        return (0>=x and x<dimension[0]) and (0>=y and y<dimension[1])
 
     def peekDirectionsToTarget(self,orientationToGoal):
         if orientationToGoal == "R_":
@@ -238,6 +292,28 @@ class Anchor:
         
     def getStringKeys(self,x,y):
         return str(x) + "," + str(y)
+    
+    def applyVariances(self,varianceConstant,candidate):
+        variancePoints = [[varianceConstant,0],
+                          [varianceConstant,-varianceConstant],
+                          [0,-varianceConstant],
+                          [-varianceConstant,-varianceConstant],
+                          [-varianceConstant,0],
+                          [-varianceConstant,varianceConstant],
+                          [0,varianceConstant],
+                          [varianceConstant,varianceConstant]]
+        hilbertVaried = []
+        for var in variancePoints:
+            hilbertVaried.append([candidate[0]+var[0],candidate[1]+var[1]])
+        return hilbertVaried
+    
+    def displayPath(self,linkedList):
+        current = linkedList
+        while current is not None:
+            print(current.value)
+            print('|')
+            print('V')
+            current = current.next
 
 class LinkedListNode:
     """Class defining the properties of the nodes that form the final solution."""
@@ -251,6 +327,10 @@ class DoublyLinkedList:
     def __init__(self,node):
         self.head = node
         self.tail = None
+        self.length = 0
+
+    def updateLength(self):
+        self.length += 1
 """
 myAnchor = Anchor({},{},(0,0),(82,50))
 print(myAnchor.slope)
